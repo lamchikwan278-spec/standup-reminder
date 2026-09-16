@@ -4,6 +4,12 @@
 
 > 玻璃拟态(glassmorphism)HUD 界面,用 Electron 做成原生桌面 App,零前端框架。
 
+<p align="center">
+  <img src="screenshots/main.png" width="380" alt="主界面 · 久坐计时">
+  &nbsp;&nbsp;
+  <img src="screenshots/calendar.png" width="380" alt="活动日历 · 每天起身热力图">
+</p>
+
 ## ✨ 功能
 
 - **久坐强提醒** —— 坐满 45 分钟(可调)自动全屏提醒起身:声音 + 系统通知 + 窗口**强制置顶抢到你眼前**(即使你正在别的全屏应用里)。
