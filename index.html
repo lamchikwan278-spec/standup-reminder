@@ -1,0 +1,756 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>纸巾别久坐 · STAND·UP</title>
+<link rel="icon" id="fav" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><circle cx='32' cy='32' r='28' fill='%2314181c'/></svg>">
+<style>
+  :root{
+    --bg1:#eef1f4; --bg2:#cbd3da; --bg3:#b7c0c8;
+    --ink:#12161a; --muted:#5b656e; --faint:#8b949c;
+    --glass:rgba(255,255,255,.5); --glass-2:rgba(255,255,255,.32);
+    --brd:rgba(255,255,255,.72); --brd-2:rgba(20,24,28,.10);
+    --dark:#14181c; --dark-2:#1c2228;
+    --accent:#9ef01a; --accent-deep:#7ac400; --accent-ink:#33540a;
+    --amber:#ffb020; --rest:#4fb8f5; --rest-deep:#2f97dd;
+    --shadow:0 24px 60px -20px rgba(20,30,40,.45);
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    --sans:-apple-system,"SF Pro Display","SF Pro Text",system-ui,"PingFang SC",sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:var(--sans); color:var(--ink);
+    background:
+      radial-gradient(120% 90% at 78% 8%, #ffffff 0%, rgba(255,255,255,0) 40%),
+      radial-gradient(140% 120% at 15% 100%, var(--bg3) 0%, rgba(183,192,200,0) 45%),
+      linear-gradient(150deg, var(--bg1) 0%, var(--bg2) 100%);
+    min-height:100%; display:flex; align-items:center; justify-content:center;
+    padding:28px; overflow:hidden; position:relative;
+    -webkit-font-smoothing:antialiased;
+  }
+  /* wispy background lines like the reference */
+  body::before{
+    content:""; position:fixed; inset:-10% -5%; z-index:0; pointer-events:none;
+    background:
+      radial-gradient(60% 40% at 20% 15%, rgba(255,255,255,.9), transparent 60%),
+      repeating-linear-gradient(115deg, rgba(255,255,255,.16) 0 1px, transparent 1px 46px);
+    filter:blur(.3px); opacity:.6;
+  }
+  .wisp{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.55}
+  /* 背景弧线保留为静止装饰,去掉流光动效以省电 */
+
+  .app{position:relative; z-index:1; width:min(560px,100%);}
+  /* 3D flip scene */
+  /* 翻转改为淡入淡出:去掉 3D 合成层,磨砂玻璃不再被每帧重算(省 CPU) */
+  .scene{}
+  .card{display:grid; position:relative}
+  .face{grid-area:1/1; min-width:0}
+  .face.back{display:none}
+  .card.flipped .face.front{display:none}
+  .card.flipped .face.back{display:block}
+
+  .panel{
+    position:relative; height:100%; border-radius:26px; padding:30px 30px 26px;
+    background:linear-gradient(160deg, rgba(255,255,255,.46), rgba(255,255,255,.14) 52%, rgba(255,255,255,.32));
+    border:1px solid rgba(255,255,255,.9);
+    box-shadow:var(--shadow), inset 0 1px 0 rgba(255,255,255,.95), inset 0 -1px 0 rgba(255,255,255,.3), inset 0 0 44px rgba(255,255,255,.16);
+    backdrop-filter:blur(30px) saturate(1.6); -webkit-backdrop-filter:blur(30px) saturate(1.6);
+  }
+  .panel::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+    background:linear-gradient(115deg, rgba(255,255,255,.5) 0%, rgba(255,255,255,0) 30%, rgba(255,255,255,0) 64%, rgba(255,255,255,.24) 100%);
+    opacity:.55}
+  /* a faint soft white light that drifts along the card edge — only while sitting */
+  @property --edge-angle{ syntax:'<angle>'; initial-value:0deg; inherits:false; }
+  .panel::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:2px;
+    pointer-events:none;z-index:2;display:none;
+    background:conic-gradient(from var(--edge-angle),
+      transparent 0deg 232deg,
+      rgba(255,255,255,.10) 270deg, rgba(255,255,255,.38) 322deg,
+      rgba(255,255,255,.60) 350deg, rgba(255,255,255,.22) 358deg, transparent 360deg);
+    -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite:xor;
+    mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask-composite:exclude;
+    filter:blur(1.5px) drop-shadow(0 0 3px rgba(255,255,255,.45))}
+  body.running .panel::before{display:block}   /* 静态微光,去掉持续 60fps 动画以省电 */
+  @keyframes edge-drift{ to{ --edge-angle:360deg } }
+  @media (prefers-reduced-motion:reduce){ body.running .panel::before{animation:none} }
+  /* HUD corner brackets */
+  .bracket{position:absolute;width:16px;height:16px;border:2px solid var(--ink);opacity:.55}
+  .bracket.tl{top:12px;left:12px;border-right:0;border-bottom:0}
+  .bracket.tr{top:12px;right:12px;border-left:0;border-bottom:0}
+  .bracket.bl{bottom:12px;left:12px;border-right:0;border-top:0}
+  .bracket.br{bottom:12px;right:12px;border-left:0;border-top:0}
+
+  .top{position:relative; display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px}
+  .brand{font-weight:800; font-size:26px; letter-spacing:-.02em; line-height:1}
+  .brandlock{display:flex; flex-direction:column; align-items:center; text-align:center; gap:1px}
+  .brandlock .slogan{justify-content:center}
+  .logo{height:40px; width:auto; margin-bottom:4px; filter:drop-shadow(0 2px 4px rgba(20,24,28,.16))}
+  .brand small{font-weight:800;color:var(--accent-deep)}
+  .sub{font-family:var(--mono); font-size:10px; letter-spacing:.22em; color:var(--muted); margin-top:5px; text-transform:uppercase}
+  .slogan{display:flex; align-items:center; gap:8px; font-weight:700; font-size:16px; letter-spacing:.04em; color:var(--ink); margin-top:7px}
+  .slogan::after{content:""; width:7px; height:7px; border-radius:2px; background:var(--accent); box-shadow:0 0 9px var(--accent); flex:none}
+  body.running .slogan::after{animation:breathe 2.6s ease-in-out infinite}
+  @keyframes breathe{0%,100%{opacity:1;box-shadow:0 0 10px var(--accent)}50%{opacity:.22;box-shadow:0 0 0 rgba(158,240,26,0)}}
+  /* 窗口藏起来时暂停一切装饰动画(流水线/边光/呼吸灯),不烧后台 GPU */
+  body.hidden-ui *,body.hidden-ui *::before,body.hidden-ui *::after{animation-play-state:paused !important}
+  .serial{font-family:var(--mono); font-size:10px; letter-spacing:.14em; color:var(--faint); text-align:right; line-height:1.7}
+  .tiles{display:flex;gap:5px;justify-content:flex-end;margin-top:8px}
+  .tiles i{width:13px;height:13px;border-radius:3px;display:block}
+  .tiles i:nth-child(1){background:#fff;box-shadow:inset 0 0 0 1px var(--brd-2)}
+  .tiles i:nth-child(2){background:var(--accent);box-shadow:0 0 8px var(--accent)}
+  .tiles i:nth-child(3){background:var(--dark)}
+
+  /* status pill */
+  .status{
+    display:inline-flex;align-items:center;gap:8px;margin:16px auto 4px;
+    font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+    padding:7px 14px;border-radius:999px;background:rgba(20,24,28,.06);color:var(--muted);
+    border:1px solid var(--brd-2);
+  }
+  .status .dot{width:8px;height:8px;border-radius:50%;background:var(--faint)}
+  .status.run{color:var(--accent-ink);background:rgba(158,240,26,.16);border-color:rgba(122,196,0,.4)}
+  .status.run .dot{background:var(--accent-deep);box-shadow:0 0 8px var(--accent)}
+  .status.away{color:#8a6d00;background:rgba(255,176,32,.16);border-color:rgba(255,176,32,.4)}
+  .status.away .dot{background:var(--amber)}
+  .status.break{color:#0f5c86;background:rgba(79,184,245,.16);border-color:rgba(79,184,245,.45)}
+  .status.break .dot{background:var(--rest);box-shadow:0 0 8px var(--rest)}
+  .center{display:flex;flex-direction:column;align-items:center}
+
+  /* ring */
+  .ring-wrap{position:relative;width:262px;height:262px;margin:6px 0 4px;touch-action:none}
+  svg.ring{transform:rotate(-90deg);display:block}
+  .track{fill:none;stroke:rgba(20,24,28,.10);stroke-width:9}
+  .prog{fill:none;stroke:var(--accent);stroke-width:10;stroke-linecap:round;
+    filter:drop-shadow(0 0 6px rgba(158,240,26,.8)); transition:stroke .3s}
+  .prog.rest{filter:drop-shadow(0 0 7px rgba(79,184,245,.9))}
+  .dial{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+  .time{font-size:62px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1}
+  .time.warn{color:var(--amber)}
+  .time.rest{color:var(--rest)}
+  .tlabel{font-family:var(--mono);font-size:10px;letter-spacing:.24em;color:var(--muted);text-transform:uppercase}
+  .knob{position:absolute;width:32px;height:32px;border-radius:50%;transform:translate(-50%,-50%);
+    background:radial-gradient(circle at 32% 26%, rgba(255,255,255,.75), rgba(255,255,255,.22) 45%, rgba(255,255,255,.05) 75%);
+    backdrop-filter:blur(8px) saturate(1.5); -webkit-backdrop-filter:blur(8px) saturate(1.5);
+    box-shadow:0 8px 20px -6px rgba(20,30,40,.32), inset 0 -3px 7px rgba(20,30,40,.12);
+    cursor:grab;touch-action:none;z-index:3;display:none;
+    transition:box-shadow .25s, transform .15s}
+  .knob::after{content:"";position:absolute;inset:0;margin:auto;width:5px;height:5px;border-radius:50%;
+    background:var(--accent);box-shadow:0 0 7px var(--accent),0 0 2px var(--accent-deep)}
+  .knob.show{display:block}
+  .knob.show:hover{transform:translate(-50%,-50%) scale(1.1);
+    box-shadow:0 10px 24px -6px rgba(20,30,40,.38), inset 0 -3px 7px rgba(20,30,40,.12)}
+  .knob:active{cursor:grabbing;transform:translate(-50%,-50%) scale(.96)}
+
+  /* controls */
+  .controls{display:flex;gap:10px;margin-top:20px;width:100%;justify-content:center}
+  button{font-family:var(--sans);cursor:pointer;border:none;border-radius:14px;font-weight:650;
+    font-size:15px;padding:14px 18px;transition:transform .08s, filter .15s, background .2s; -webkit-tap-highlight-color:transparent}
+  button:active{transform:translateY(1px)}
+  button:disabled{opacity:.45;cursor:not-allowed;filter:grayscale(.4)}
+  button:disabled:active{transform:none}
+  .btn-primary{flex:1;background:linear-gradient(180deg,var(--accent),var(--accent-deep));color:#1c2a00;
+    box-shadow:0 8px 22px -8px rgba(122,196,0,.9),inset 0 1px 0 rgba(255,255,255,.5)}
+  .btn-primary:hover{filter:brightness(1.05)}
+  .btn-ghost{min-width:120px;background:rgba(20,24,28,.06);color:var(--ink);border:1px solid var(--brd-2)}
+  .btn-ghost:hover{background:rgba(20,24,28,.11)}
+  .btn-dark{min-width:120px;background:var(--dark);color:#eef2f4}
+  .btn-dark:hover{background:var(--dark-2)}
+
+  /* settings + stats */
+  .row{display:flex;gap:12px;margin-top:16px}
+  .field{flex:1;background:rgba(255,255,255,.4);border:1px solid var(--brd-2);border-radius:14px;padding:11px 14px}
+  .field label{font-family:var(--mono);font-size:9px;letter-spacing:.18em;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:5px}
+  .field .val{display:flex;align-items:baseline;gap:6px}
+  .field input{width:52px;background:transparent;border:none;font-family:var(--sans);font-size:22px;font-weight:800;color:var(--ink);outline:none}
+  .field .unit{font-size:12px;color:var(--muted)}
+  .field.stat .val b{font-size:22px;font-weight:800}
+  .field.tap{cursor:pointer;user-select:none}
+  .field.tap:hover{background:rgba(255,255,255,.6)}
+  .sound-on{color:var(--accent-ink)}
+  .foot{margin-top:16px;font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;color:var(--faint);text-align:center;line-height:1.7}
+
+  /* flip button + back-face calendar */
+  .flip-btn{margin-top:8px;font-family:var(--mono);font-size:10px;letter-spacing:.12em;font-weight:700;
+    padding:7px 12px;border-radius:999px;background:rgba(255,255,255,.55);border:1px solid var(--brd-2);color:var(--ink);cursor:pointer}
+  .flip-btn:hover{background:#fff}
+  .top>div:last-child{display:flex;flex-direction:column;align-items:flex-end}
+  .back-face{cursor:pointer;display:flex;flex-direction:column}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:14px;flex:1;align-content:start}
+  .wd{font-family:var(--mono);font-size:9px;color:var(--muted);text-align:center;letter-spacing:.14em;padding-bottom:2px}
+  .cal-cell{aspect-ratio:1;border-radius:10px;background:rgba(255,255,255,.34);border:1px solid var(--brd-2);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.15}
+  .cal-cell .d{font-size:9.5px;color:var(--muted);font-weight:650}
+  .cal-cell .n{font-size:14px;font-weight:800}
+  .cal-cell.blank{background:transparent;border:none}
+  .cal-cell.future{opacity:.35}
+  .cal-cell.today{box-shadow:0 0 0 2px var(--accent-deep),0 0 12px rgba(158,240,26,.55)}
+  .cal-cell.lv1{background:rgba(158,240,26,.20)}
+  .cal-cell.lv2{background:rgba(158,240,26,.40)}
+  .cal-cell.lv3{background:rgba(158,240,26,.62)}
+  .cal-cell.lv4{background:linear-gradient(180deg,var(--accent),var(--accent-deep))}
+  .cal-cell.lv4 .d,.cal-cell.lv4 .n{color:#1c2a00}
+  .cal-legend{display:flex;align-items:center;justify-content:center;gap:5px;margin-top:14px;font-family:var(--mono);font-size:9px;letter-spacing:.14em;color:var(--muted)}
+  .cal-legend i{width:12px;height:12px;border-radius:3px;background:rgba(255,255,255,.34);border:1px solid var(--brd-2)}
+  .cal-legend i.lv1{background:rgba(158,240,26,.20)}
+  .cal-legend i.lv2{background:rgba(158,240,26,.40)}
+  .cal-legend i.lv3{background:rgba(158,240,26,.62)}
+  .cal-legend i.lv4{background:var(--accent)}
+
+  /* ALERT overlay */
+  .overlay{position:fixed;inset:0;z-index:50;display:none;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;color:#f2fff0;padding:32px;animation:flash 1s steps(1) infinite}
+  .overlay.show{display:flex}
+  @keyframes flash{0%,49%{background:radial-gradient(circle at 50% 40%,#1a2200,#000 80%)}50%,100%{background:radial-gradient(circle at 50% 40%,#7ac400,#243800 85%)}}
+  .ov-kicker{font-family:var(--mono);letter-spacing:.4em;font-size:13px;color:var(--accent);text-transform:uppercase}
+  .ov-title{font-size:min(15vw,86px);font-weight:900;letter-spacing:-.02em;margin:10px 0 6px;text-shadow:0 4px 30px rgba(0,0,0,.4)}
+  .ov-tip{font-size:min(5vw,22px);font-weight:600;opacity:.95;max-width:14em;margin-bottom:34px}
+  .ov-tip b{color:var(--accent)}
+  .ov-actions{display:flex;gap:14px;flex-wrap:wrap;justify-content:center}
+  .ov-btn{background:var(--accent);color:#14200a;font-size:19px;font-weight:800;padding:18px 34px;border-radius:16px;
+    box-shadow:0 12px 30px -8px rgba(0,0,0,.5)}
+  .ov-mute{background:rgba(255,255,255,.14);color:#eef;border:1px solid rgba(255,255,255,.3);font-size:16px;padding:18px 26px;border-radius:16px}
+  .ov-sat{margin-top:26px;font-family:var(--mono);font-size:11px;letter-spacing:.2em;color:rgba(255,255,255,.6)}
+
+  @media (max-width:480px){.panel{padding:24px 20px}.time{font-size:52px}.ring-wrap{width:230px;height:230px}}
+</style>
+
+<svg class="wisp" preserveAspectRatio="none" viewBox="0 0 560 900">
+  <path d="M-20 120 C 180 40, 360 200, 620 90" stroke="rgba(255,255,255,.8)" stroke-width="2" fill="none"/>
+  <path d="M-20 160 C 160 90, 380 250, 620 150" stroke="rgba(255,255,255,.5)" stroke-width="1.5" fill="none"/>
+  <path d="M-20 780 C 200 720, 360 860, 620 760" stroke="rgba(255,255,255,.4)" stroke-width="1.5" fill="none"/>
+</svg>
+
+<div class="app">
+ <div class="scene">
+  <div class="card" id="card">
+   <div class="face front">
+  <div class="panel">
+    <span class="bracket tl"></span><span class="bracket tr"></span>
+    <span class="bracket bl"></span><span class="bracket br"></span>
+
+    <div class="top">
+      <div class="brandlock">
+        <img class="logo" src="angel.png" alt="">
+        <div>
+          <div class="brand">STAND·UP</div>
+          <div class="slogan">纸巾别久坐</div>
+          <div class="sub">Sit-Stand Monitor</div>
+        </div>
+      </div>
+      <div>
+        <div class="serial">MODEL-1011<br>REF · <span id="refMin">45</span>:00</div>
+        <div class="tiles"><i></i><i></i><i></i></div>
+        <button class="flip-btn" id="flipBtn" title="翻转查看本月活动记录">▦ 本月记录</button>
+      </div>
+    </div>
+
+    <div class="center">
+      <div class="status" id="status"><span class="dot"></span><span id="statusText">Ready · 待命</span></div>
+
+      <div class="ring-wrap">
+        <svg class="ring" width="262" height="262" viewBox="0 0 262 262">
+          <circle class="track" cx="131" cy="131" r="118"></circle>
+          <circle class="prog"  cx="131" cy="131" r="118" id="prog"></circle>
+        </svg>
+        <div class="dial">
+          <div class="time" id="time">45:00</div>
+          <div class="tlabel" id="tlabel">Active Sitting</div>
+        </div>
+        <div class="knob" id="knob" title="拖动圆点临时增减时间"></div>
+      </div>
+
+      <div class="controls">
+        <button class="btn-primary" id="startBtn">开始久坐计时</button>
+        <button class="btn-ghost" id="pauseBtn" hidden>暂停</button>
+        <button class="btn-dark" id="resetBtn">重置</button>
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label>时长 · Duration</label>
+          <div class="val"><input id="mins" type="number" min="1" max="180" value="45"><span class="unit">分钟</span></div>
+        </div>
+        <div class="field tap stat" id="soundField">
+          <label>声音 · Sound</label>
+          <div class="val"><b id="soundState" class="sound-on">开 · ON</b></div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="field stat"><label>今日轮次 · Rounds</label><div class="val"><b id="rounds">0</b><span class="unit">轮</span></div></div>
+        <div class="field stat"><label>起身活动 · Breaks</label><div class="val"><b id="breaks">0</b><span class="unit">次</span></div></div>
+      </div>
+
+      <div class="foot">到点强提醒 · 切换软件 / 标签页都不影响计时 · 想休息按「暂停」或「重置」· 别关此标签页</div>
+      <div class="foot" id="notifHint" style="margin-top:6px"></div>
+    </div>
+  </div>
+   </div>
+
+   <div class="face back">
+  <div class="panel back-face" id="backPanel" title="点击任意处翻回正面">
+    <span class="bracket tl"></span><span class="bracket tr"></span>
+    <span class="bracket bl"></span><span class="bracket br"></span>
+
+    <div class="top">
+      <div>
+        <div class="brand">活动日历 <small>▦</small></div>
+        <div class="slogan">每天起身了几次</div>
+        <div class="sub">Monthly Breaks · <span id="calLabel"></span></div>
+      </div>
+      <div><button class="flip-btn" id="backBtn">◑ 返回计时</button></div>
+    </div>
+
+    <div class="row">
+      <div class="field stat"><label>本月起身 · Total</label><div class="val"><b id="calTotal">0</b><span class="unit">次</span></div></div>
+      <div class="field stat"><label>活跃天数 · Active</label><div class="val"><b id="calDays">0</b><span class="unit">天</span></div></div>
+    </div>
+
+    <div class="cal-grid" id="calGrid"></div>
+    <div class="cal-legend">少 <i></i><i class="lv1"></i><i class="lv2"></i><i class="lv3"></i><i class="lv4"></i> 多</div>
+    <div class="foot">点击卡片任意处翻回正面</div>
+  </div>
+   </div>
+
+  </div>
+ </div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="ov-kicker">TIME TO MOVE</div>
+  <div class="ov-title">起来动一下!</div>
+  <div class="ov-tip" id="ovTip"></div>
+  <div class="ov-actions">
+    <button class="ov-btn" id="doneBtn">立即开始休息 (空格)</button>
+    <button class="ov-mute" id="muteBtn">🔇 静音</button>
+  </div>
+  <div class="ov-sat" id="ovSat">已连续坐满 45 分钟 · <span id="ovAuto">8</span> 秒后自动进入休息</div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var $ = function(id){ return document.getElementById(id); };
+
+  // 诊断日志已关闭(强提醒问题已定位修复)。留空函数,保留各处调用点,需要时把函数体加回即可。
+  function dlog(msg){}
+
+  // ---- config (tweakable) ----
+  var BREAK_MS  = 5*60*1000;   // enforced activity break after each sit before you can start again
+  var PREALERT  = 15;          // seconds of amber heads-up before firing
+  var BEEP_MS   = 1400;        // beep interval during alert
+
+  var TIPS = [
+    "站起来,<b>远眺窗外 20 秒</b>护眼",
+    "<b>转肩 + 扩胸</b> 各 10 次",
+    "接一杯水,<b>走一小圈</b>",
+    "<b>靠墙站 30 秒</b>,收紧核心",
+    "<b>踮脚尖 20 下</b>,活动小腿",
+    "脖子<b>左右各转 5 圈</b>",
+    "抬头看天花板,<b>拉伸颈前侧</b>"
+  ];
+
+  // ---- state ----
+  var CIRC = 2*Math.PI*118;
+  var progEl = $("prog");
+  var knob = $("knob");
+  progEl.style.strokeDasharray = CIRC;
+  var KR = 118/262*100;                 // ring radius as % of the box (for the drag knob)
+  function positionKnob(frac){
+    var a = frac*2*Math.PI;             // angle clockwise from top
+    knob.style.left = (50 + KR*Math.sin(a)) + "%";
+    knob.style.top  = (50 - KR*Math.cos(a)) + "%";
+  }
+
+  var winHidden = false;          // 窗口是否已藏进菜单栏 —— 由主进程 hide/show 明确驱动,比 document.hidden 可靠
+  var state = "ready";            // ready | running | away | alert
+  var durationMs = 45*60*1000;
+  var remainingMs = durationMs;
+  var lastTick = 0, lastActivity = 0;
+  var soundOn = true;
+  var stats = { date:"", rounds:0, breaks:0 };
+  var baseTitle = document.title;
+
+  // ---- persistence ----
+  function todayStr(){ var d=new Date(); return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate(); }
+  function loadPrefs(){
+    try{
+      var p = JSON.parse(localStorage.getItem("standup.prefs")||"{}");
+      if(p.minutes) $("mins").value = p.minutes;
+      if(typeof p.soundOn === "boolean") soundOn = p.soundOn;
+    }catch(e){}
+    try{
+      var s = JSON.parse(localStorage.getItem("standup.stats")||"{}");
+      if(s.date===todayStr()){ stats = s; }
+    }catch(e){}
+    stats.date = todayStr();
+    renderStats(); renderSound(); syncDuration();
+  }
+  function savePrefs(){ localStorage.setItem("standup.prefs", JSON.stringify({minutes:+$("mins").value, soundOn:soundOn})); }
+  function loadHistory(){ try{ return JSON.parse(localStorage.getItem("standup.history")||"{}"); }catch(e){ return {}; } }
+  function saveStats(){
+    stats.date=todayStr(); localStorage.setItem("standup.stats", JSON.stringify(stats));
+    var h=loadHistory(); h[stats.date]={rounds:stats.rounds, breaks:stats.breaks};
+    localStorage.setItem("standup.history", JSON.stringify(h));
+  }
+
+  function renderStats(){ $("rounds").textContent=stats.rounds; $("breaks").textContent=stats.breaks; }
+  function renderSound(){ $("soundState").textContent = soundOn?"开 · ON":"关 · OFF"; $("soundState").className = soundOn?"sound-on":""; }
+  function syncDuration(){
+    var m = Math.max(1, Math.min(180, +$("mins").value||45));
+    durationMs = m*60*1000; $("refMin").textContent = m;
+    if(state==="ready"){ remainingMs = durationMs; render(); }
+  }
+
+  // ---- audio ----
+  var actx = null;
+  function ensureAudio(){
+    if(!actx){ try{ actx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} }
+    if(actx && actx.state==="suspended"){ actx.resume(); }
+  }
+  function beep(){
+    if(!soundOn || !actx) return;
+    try{
+      var t = actx.currentTime;
+      [[880,0],[1245,0.18]].forEach(function(p){
+        var o=actx.createOscillator(), g=actx.createGain();
+        o.type="sine"; o.frequency.value=p[0];
+        g.gain.setValueAtTime(0, t+p[1]);
+        g.gain.linearRampToValueAtTime(0.28, t+p[1]+0.02);
+        g.gain.exponentialRampToValueAtTime(0.0008, t+p[1]+0.17);
+        o.connect(g); g.connect(actx.destination);
+        o.start(t+p[1]); o.stop(t+p[1]+0.2);
+      });
+    }catch(e){}   // 音频设备异常时静默失败,绝不能让强提醒/自动转入休息的逻辑被它打断
+  }
+  // silent keep-alive: a barely-there tone keeps the tab "audible" so the browser won't
+  // freeze/suspend it in the background — otherwise the countdown stalls and never fires.
+  var kaOsc=null, kaGain=null;
+  function setKeepAlive(on){
+    if(window.require) return;   // 原生版不需要保活音频(已关后台节流),开着纯耗电
+    if(on){
+      ensureAudio(); if(!actx || kaOsc) return;
+      kaOsc=actx.createOscillator(); kaGain=actx.createGain();
+      kaGain.gain.value=0.0008; kaOsc.frequency.value=440;
+      kaOsc.connect(kaGain); kaGain.connect(actx.destination); kaOsc.start();
+    } else if(kaOsc){
+      try{ kaOsc.stop(); }catch(e){} try{ kaOsc.disconnect(); }catch(e){} kaOsc=null;
+    }
+  }
+
+  // ---- notifications ----
+  function askNotify(){
+    if("Notification" in window && Notification.permission==="default"){
+      try{ Notification.requestPermission().then(updateNotifHint); }
+      catch(e){ try{ Notification.requestPermission(updateNotifHint); }catch(_){} }
+    }
+    updateNotifHint();
+  }
+  function updateNotifHint(){
+    var el=$("notifHint"); if(!el) return;
+    if(!("Notification" in window)){ el.textContent="⚠ 此浏览器不支持系统通知 · 提醒靠声音 + 页面闪烁"; return; }
+    var p=Notification.permission;
+    if(p==="granted") el.textContent="🔔 系统通知已开启 · 在别的软件里也会弹横幅提醒";
+    else if(p==="denied") el.textContent="🔕 系统通知被拦截 · 目前只有声音提醒(修复方法见下)";
+    else el.textContent="🔔 点「开始」会请求通知权限,请选「允许」";
+  }
+  function notify(tipText){
+    if(!("Notification" in window) || Notification.permission!=="granted") return;
+    try{
+      var n = new Notification("⏰ 起来动一下!", { body: tipText.replace(/<[^>]+>/g,"")+" · 已连续坐满 "+Math.round(durationMs/60000)+" 分钟", requireInteraction:true, tag:"standup" });
+      n.onclick = function(){ window.focus(); n.close(); };
+    }catch(e){}
+  }
+
+  // ---- title / favicon flash ----
+  var flashTimer=null, favEl=$("fav");
+  function setFav(alertOn){
+    favEl.href = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><circle cx='32' cy='32' r='28' fill='"+(alertOn?"%239ef01a":"%2314181c")+"'/></svg>";
+  }
+  function startFlash(){ var on=false; flashTimer=setInterval(function(){ on=!on; document.title = on?"⏰ 起来动一下!":baseTitle; setFav(on); },800); }
+  function stopFlash(){ if(flashTimer)clearInterval(flashTimer); flashTimer=null; document.title=baseTitle; setFav(false); }
+
+  // ---- render ----
+  function fmt(ms){ var s=Math.max(0,Math.ceil(ms/1000)); var m=Math.floor(s/60); s=s%60; return (m<10?"0":"")+m+":"+(s<10?"0":"")+s; }
+  function render(){
+    sendTray();
+    if(winHidden || document.hidden) return;   // 窗口藏着:只更新菜单栏倒计时,不画界面(省电)
+    $("time").textContent = fmt(remainingMs);
+    var isBreak = (state==="break");
+    var full = isBreak ? BREAK_MS : durationMs;
+    var frac = Math.max(0, Math.min(1, remainingMs/full));
+    progEl.style.strokeDashoffset = CIRC*(1-frac);
+    progEl.classList.toggle("rest", isBreak);
+    positionKnob(frac);
+    knob.classList.toggle("show", state==="running" || state==="paused");
+    var warn = (state==="running" && remainingMs<=PREALERT*1000);
+    $("time").className = "time"+(warn?" warn":"")+(isBreak?" rest":"");
+    progEl.style.stroke = warn ? "var(--amber)" : (isBreak ? "var(--rest)" : "var(--accent)");
+    $("tlabel").textContent = isBreak ? "Break · 活动中" : "Active Sitting";
+  }
+  // 原生版:把倒计时文字发到菜单栏托盘(电池那一排)
+  var lastTrayLabel = null;
+  function sendTray(){
+    if(!window.require) return;
+    var label;
+    if(state==="running")      label = fmt(remainingMs);
+    else if(state==="break")   label = "休 " + fmt(remainingMs);
+    else if(state==="paused")  label = "‖ " + fmt(remainingMs);
+    else if(state==="alert")   label = "起来!";
+    else                       label = "";   // 待命:只显示秒表图标
+    if(label === lastTrayLabel) return;       // 内容没变就不重画不重发(待命时几乎零开销)
+    lastTrayLabel = label;
+    try{ window.require("electron").ipcRenderer.send("tray", renderTrayImage(label)); }catch(e){}
+  }
+  function drawStopwatch(ctx, cx, cy, r, lw){
+    ctx.lineWidth=lw; ctx.lineCap="round"; ctx.lineJoin="round";
+    ctx.beginPath(); ctx.arc(cx, cy+r*0.12, r*0.8, 0, Math.PI*2); ctx.stroke();          // 表身
+    ctx.beginPath(); ctx.moveTo(cx, cy-r*0.98); ctx.lineTo(cx, cy-r*0.55); ctx.stroke(); // 顶部连杆
+    ctx.beginPath(); ctx.moveTo(cx-r*0.4, cy-r*1.05); ctx.lineTo(cx+r*0.4, cy-r*1.05); ctx.stroke(); // 按钮
+    ctx.beginPath(); ctx.moveTo(cx, cy+r*0.12); ctx.lineTo(cx+r*0.42, cy-r*0.33); ctx.stroke();     // 指针
+  }
+  function renderTrayImage(label){
+    var s=2, H=22*s, pad=2*s, icon=15*s, gap=label?4*s:0;
+    var font="600 "+(13*s)+'px -apple-system,"SF Pro Text",system-ui,sans-serif';
+    var mctx=document.createElement("canvas").getContext("2d"); mctx.font=font;
+    var tw=label?Math.ceil(mctx.measureText(label).width):0;
+    var W=pad+icon+gap+tw+pad;
+    var c=document.createElement("canvas"); c.width=W; c.height=H;
+    var ctx=c.getContext("2d");
+    ctx.fillStyle="#000"; ctx.strokeStyle="#000";
+    drawStopwatch(ctx, pad+icon/2, H/2, icon/2, 1.7*s);
+    if(label){ ctx.font=font; ctx.textAlign="left"; ctx.textBaseline="middle"; ctx.fillText(label, pad+icon+gap, H/2+0.5*s); }
+    return c.toDataURL("image/png");
+  }
+  function setStatus(cls, text){ var el=$("status"); el.className="status "+cls; $("statusText").textContent=text;
+    document.body.classList.toggle("running", state==="running");
+    try{ if(window.require){ window.require("electron").ipcRenderer.send("state", state); } }catch(e){}  // 原生版:上报当前状态给主进程做"该开始了"提醒
+    sendTray();
+  }
+
+  // ---- state transitions ----
+  function start(){
+    ensureAudio(); setKeepAlive(true); askNotify(); syncDuration(); savePrefs();
+    remainingMs = durationMs; state="running"; lastTick=Date.now(); lastActivity=Date.now();
+    $("startBtn").hidden=true; $("pauseBtn").hidden=false; $("pauseBtn").textContent="暂停";
+    setStatus("run","Active Sitting · 计时中"); render();
+  }
+  function pauseManual(){
+    if(state==="running"){ state="paused"; setStatus("away","Paused · 已暂停"); $("pauseBtn").textContent="继续"; }
+    else if(state==="paused"){ setKeepAlive(true); state="running"; lastTick=Date.now(); lastActivity=Date.now(); setStatus("run","Active Sitting · 计时中"); $("pauseBtn").textContent="暂停"; }
+  }
+  function resetAll(){
+    stopAlert(); setKeepAlive(false);
+    try{ if(window.require){ window.require("electron").ipcRenderer.send("standup-alert-clear"); } }catch(e){}  // 保险:确保不会残留置顶状态
+    state="ready"; remainingMs=durationMs;
+    $("startBtn").hidden=false; $("startBtn").disabled=false; $("startBtn").textContent="开始久坐计时";
+    $("pauseBtn").hidden=true;
+    setStatus("","Ready · 待命"); render();
+  }
+  function freshCycle(countBreak, countRound){
+    if(countBreak) stats.breaks++;
+    if(countRound) stats.rounds++;
+    if(countBreak||countRound){ renderStats(); saveStats(); }
+    remainingMs=durationMs; state="running"; lastTick=Date.now(); lastActivity=Date.now();
+    setStatus("run","Active Sitting · 计时中"); render();
+  }
+
+  // ---- ALERT ----
+  var beepTimer=null;
+  var ALERT_AUTO_S = 8;   // 强提醒展示这么多秒后,自动进入休息,不需要点按钮确认
+  var alertDeadline = 0;  // 绝对时间戳,由主循环 tick() 驱动(不用独立计时器,避免和其他定时器打架)
+  function fireAlert(){
+    dlog("fireAlert() 开始 · winHidden=" + winHidden + " document.hidden=" + document.hidden);
+    state="alert";
+    var tip = TIPS[stats.rounds % TIPS.length];
+    $("ovTip").innerHTML = tip;
+    $("overlay").classList.add("show");
+    setStatus("away","Time to move · 该起身了");
+    // 自动转入休息的倒计时最先落地,绝不能被下面任何一个"锦上添花"的副作用(通知/声音/闪烁/IPC)拖累或打断
+    alertDeadline = Date.now() + ALERT_AUTO_S*1000;
+    updateAlertCountdown();
+    dlog("overlay已加show类 · alertDeadline已设置,准备发standup-alert IPC");
+    try{
+      if(window.require){ window.require("electron").ipcRenderer.send("standup-alert"); dlog("standup-alert IPC 已发送(未抛错)"); }
+      else dlog("window.require 不存在,不是原生环境!");
+    }catch(e){ dlog("standup-alert IPC 发送抛错: " + e.message); }
+    try{ notify(tip); dlog("notify() 执行完(未抛错) · Notification权限=" + (("Notification" in window)?Notification.permission:"无Notification API")); }
+    catch(e){ dlog("notify() 抛错: " + e.message); }
+    try{ startFlash(); }catch(e){ dlog("startFlash() 抛错: " + e.message); }
+    try{ beep(); if(soundOn){ beepTimer=setInterval(beep, BEEP_MS); } dlog("beep()执行完 · soundOn=" + soundOn + " actx存在=" + !!actx); }
+    catch(e){ dlog("beep() 抛错: " + e.message); }
+    dlog("fireAlert() 结束");
+  }
+  function updateAlertCountdown(){
+    // 注意:不要再引用 ovAuto——它是 ovSat 的子节点,下面这句 textContent 会把它抹掉,
+    // 之后再取 $("ovAuto") 就是 null,一取 .textContent 就抛错、整个 fireAlert 崩在半路。
+    var left = Math.max(0, Math.ceil((alertDeadline - Date.now())/1000));
+    var el=$("ovSat"); if(el) el.textContent = "已连续坐满 "+Math.round(durationMs/60000)+" 分钟 · "+left+" 秒后自动进入休息";
+  }
+  function stopAlert(){
+    $("overlay").classList.remove("show");
+    if(beepTimer){ clearInterval(beepTimer); beepTimer=null; }
+    stopFlash();
+  }
+  function dismissAlert(){
+    dlog("dismissAlert() 触发 → 即将进入休息");
+    stopAlert();
+    try{ if(window.require){ window.require("electron").ipcRenderer.send("standup-alert-clear"); } }catch(e){}  // 原生版:恢复窗口正常层级
+    startBreak();             // 到点(或手动/自动确认)-> 强制 5 分钟活动,不再需要额外确认
+  }
+
+  // ---- enforced activity break ----
+  function startBreak(){
+    setKeepAlive(true);
+    stats.rounds++; renderStats(); saveStats();     // one sit completed
+    state="break"; remainingMs=BREAK_MS; lastTick=Date.now();
+    $("startBtn").hidden=false; $("startBtn").disabled=true; $("startBtn").textContent="起身活动中…";
+    $("pauseBtn").hidden=true;
+    setStatus("break","起身活动中 · REST"); render();
+  }
+  function endBreak(){
+    setKeepAlive(false);
+    stats.breaks++; renderStats(); saveStats();      // a full 5-min activity completed
+    state="ready"; remainingMs=durationMs;
+    $("startBtn").disabled=false; $("startBtn").hidden=false; $("startBtn").textContent="开始下一轮 ▸";
+    $("pauseBtn").hidden=true;
+    setStatus("","休息完成 · 可以开始下一轮"); render();
+    ensureAudio(); chime(); breakDoneNotify();
+  }
+  function chime(){
+    if(!soundOn || !actx) return;
+    var t=actx.currentTime;
+    [[659,0],[988,0.15],[1319,0.30]].forEach(function(p){
+      var o=actx.createOscillator(), g=actx.createGain();
+      o.type="sine"; o.frequency.value=p[0];
+      g.gain.setValueAtTime(0,t+p[1]);
+      g.gain.linearRampToValueAtTime(0.22,t+p[1]+0.03);
+      g.gain.exponentialRampToValueAtTime(0.0008,t+p[1]+0.5);
+      o.connect(g); g.connect(actx.destination);
+      o.start(t+p[1]); o.stop(t+p[1]+0.55);
+    });
+  }
+  function breakDoneNotify(){
+    if(("Notification" in window) && Notification.permission==="granted"){
+      try{ var n=new Notification("✅ 活动结束", {body:"5 分钟到,坐下开始新一轮吧", tag:"standup"}); n.onclick=function(){ window.focus(); n.close(); }; }catch(e){}
+    }
+  }
+
+  // ---- main loop: plain wall-clock while running; switching apps/tabs never resets it ----
+  function tick(){
+    var now=Date.now();
+    if(stats.date!==todayStr()){ stats={date:todayStr(),rounds:0,breaks:0}; saveStats(); renderStats(); }  // midnight rollover
+    if(state==="running"){
+      remainingMs -= (now-lastTick); lastTick=now;   // true wall-clock; background time counts so it always reaches 0
+      if(remainingMs<=0){ remainingMs=0; render(); fireAlert(); return; }
+      render();
+    } else if(state==="break"){
+      remainingMs -= (now-lastTick); lastTick=now;
+      if(remainingMs<=0){ remainingMs=0; render(); endBreak(); return; }
+      render();
+    } else if(state==="alert"){
+      lastTick=now;
+      if(now>=alertDeadline){ dismissAlert(); return; }   // 到点没人理,自动进入休息
+      updateAlertCountdown();
+    } else {
+      lastTick=now;
+    }
+  }
+  setInterval(tick, 1000);
+
+  // ---- wire up ----
+  $("startBtn").addEventListener("click", start);
+  $("pauseBtn").addEventListener("click", pauseManual);
+  $("resetBtn").addEventListener("click", resetAll);
+  $("mins").addEventListener("change", function(){ syncDuration(); savePrefs(); });
+  $("soundField").addEventListener("click", function(){ soundOn=!soundOn; renderSound(); savePrefs(); if(soundOn)ensureAudio(); });
+  $("doneBtn").addEventListener("click", function(){ dismissAlert(false); });
+  $("muteBtn").addEventListener("click", function(){ soundOn=false; renderSound(); savePrefs(); if(beepTimer){clearInterval(beepTimer);beepTimer=null;} });
+  document.addEventListener("keydown", function(e){ if(state==="alert" && (e.code==="Space"||e.key===" ")){ e.preventDefault(); dismissAlert(false); } });
+
+  // returning to the tab with an alert waiting -> make sure it's audible
+  document.addEventListener("visibilitychange", function(){
+    document.body.classList.toggle("hidden-ui", document.hidden);  // 藏起→暂停装饰动画;可见→恢复
+    if(!document.hidden) render();                                  // 重新可见时立即补画界面
+    if(!document.hidden && state==="alert" && soundOn){ ensureAudio(); if(!beepTimer)beepTimer=setInterval(beep,BEEP_MS); beep(); }
+  });
+
+  // ---- drag the ring to add/remove time on the fly ----
+  var ringWrap = document.querySelector(".ring-wrap");
+  var dragging=false, dragWasRunning=false, lastFrac=0;
+  function pointerFrac(e){
+    var r = ringWrap.getBoundingClientRect();
+    var cx=r.left+r.width/2, cy=r.top+r.height/2;
+    var dx=e.clientX-cx, dy=e.clientY-cy;
+    var a = Math.atan2(dy,dx) + Math.PI/2;            // clockwise from top
+    if(a<0) a+=2*Math.PI; if(a>=2*Math.PI) a-=2*Math.PI;
+    return { frac:a/(2*Math.PI), dist:Math.sqrt(dx*dx+dy*dy), R:r.width/2 };
+  }
+  function applyDrag(e){
+    var p=pointerFrac(e), f=p.frac;
+    if(f-lastFrac > 0.5) f=0;                          // anti-wrap across the top
+    else if(lastFrac-f > 0.5) f=1;
+    lastFrac=f;
+    remainingMs = f*durationMs;
+    render();
+  }
+  ringWrap.addEventListener("pointerdown", function(e){
+    if(state!=="running" && state!=="paused") return;
+    var p=pointerFrac(e);
+    if(p.dist < p.R*0.5 || p.dist > p.R*1.25) return; // only when grabbing near the ring
+    dragging=true; dragWasRunning=(state==="running"); state="paused";
+    lastFrac=Math.max(0,Math.min(1,remainingMs/durationMs));
+    setStatus("away","拖动调整中…"); applyDrag(e); e.preventDefault();
+  });
+  window.addEventListener("pointermove", function(e){ if(dragging) applyDrag(e); });
+  function endDrag(){
+    if(!dragging) return; dragging=false;
+    if(dragWasRunning){ state="running"; lastTick=Date.now(); setStatus("run","Active Sitting · 计时中"); }
+    else { setStatus("away","Paused · 已暂停"); }
+  }
+  window.addEventListener("pointerup", endDrag);
+  window.addEventListener("pointercancel", endDrag);
+
+  // ---- card flip + monthly calendar ----
+  var card=$("card");
+  function renderCalendar(){
+    var h=loadHistory();
+    h[todayStr()]={rounds:stats.rounds, breaks:stats.breaks};   // include today's live count
+    var now=new Date(), y=now.getFullYear(), mo=now.getMonth(), today=now.getDate();
+    $("calLabel").textContent = y+"年"+(mo+1)+"月";
+    var dim=new Date(y,mo+1,0).getDate();
+    var lead=(new Date(y,mo,1).getDay()+6)%7;                   // Monday-first
+    var total=0, days=0, html="";
+    ["一","二","三","四","五","六","日"].forEach(function(w){ html+='<span class="wd">'+w+'</span>'; });
+    for(var i=0;i<lead;i++) html+='<span class="cal-cell blank"></span>';
+    for(var d=1;d<=dim;d++){
+      var rec=h[y+"-"+(mo+1)+"-"+d], b=rec?(rec.breaks||0):0;
+      if(d<=today){ total+=b; if(b>0)days++; }
+      var lv = b<=0?"":(b<2?" lv1":b<4?" lv2":b<6?" lv3":" lv4");
+      html+='<span class="cal-cell'+lv+(d===today?" today":"")+(d>today?" future":"")+'">'
+          + '<span class="d">'+d+'</span>'+(b>0?'<span class="n">'+b+'</span>':"")+'</span>';
+    }
+    $("calGrid").innerHTML=html;
+    $("calTotal").textContent=total;
+    $("calDays").textContent=days;
+  }
+  $("flipBtn").addEventListener("click", function(){ renderCalendar(); card.classList.add("flipped"); });
+  $("backPanel").addEventListener("click", function(){ card.classList.remove("flipped"); });
+
+  // ---- native: main process asks us to start (from the "该开始了" nudge) ----
+  try{ if(window.require){ window.require("electron").ipcRenderer.on("do-start", function(){ if(state==="ready") start(); }); } }catch(e){}
+
+  // ---- native: 主进程明确告知窗口藏起/显示 → 停/续一切绘制 ----
+  // 根治:win.hide() 不一定触发 visibilitychange,导致隐藏后仍以 60fps 空绘(边光/磨砂/重绘)狂烧 CPU。
+  // 收到 hidden 立即暂停装饰动画 + 跳过界面重绘,只留每秒一次的菜单栏倒计时(墙钟计时精度不受影响)。
+  try{ if(window.require){ window.require("electron").ipcRenderer.on("vis", function(e, v){
+    winHidden = (v === "hidden");
+    document.body.classList.toggle("hidden-ui", winHidden);
+    if(!winHidden) render();   // 重新显示:立刻补画界面
+  }); } }catch(e){}
+
+  // ---- init ----
+  loadPrefs(); render(); updateNotifHint();
+  try{ if(window.require){ window.require("electron").ipcRenderer.send("state", state); } }catch(e){}  // 开机上报初始状态
+})();
+</script>

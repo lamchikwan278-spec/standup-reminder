@@ -1,0 +1,24 @@
+{
+  "name": "standup-reminder",
+  "version": "1.0.0",
+  "description": "纸巾别久坐 —— 一个会强提醒你起身的 macOS 久坐提醒小工具",
+  "main": "main.js",
+  "author": "",
+  "license": "MIT",
+  "keywords": [
+    "standup",
+    "reminder",
+    "pomodoro",
+    "health",
+    "electron",
+    "macos",
+    "久坐提醒"
+  ],
+  "scripts": {
+    "start": "electron .",
+    "dist": "npx --yes @electron/packager . 纸巾别久坐 --icon=icon.icns --overwrite --out=dist --app-bundle-id=com.jinbie.standup"
+  },
+  "devDependencies": {
+    "electron": "^40.10.2"
+  }
+}

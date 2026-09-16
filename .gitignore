@@ -1,0 +1,14 @@
+# 依赖(别人 npm install 自己装)
+node_modules/
+
+# 构建产物
+build/
+dist/
+
+# 图标中间文件(保留 icon.icns 和 icon-1024.png 即可)
+icon.iconset/
+icon-src.png
+
+# 杂项
+*.log
+.DS_Store
